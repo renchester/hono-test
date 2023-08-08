@@ -1,32 +1,66 @@
+import { Hono } from 'hono';
+import { cors } from 'hono/cors';
+
+type Bindings = {
+	DB: D1Database;
+};
+
 /**
- * Welcome to Cloudflare Workers! This is your first worker.
- *
- * - Run `npm run dev` in your terminal to start a development server
- * - Open a browser tab at http://localhost:8787/ to see your worker in action
- * - Run `npm run deploy` to publish your worker
- *
- * Learn more at https://developers.cloudflare.com/workers/
+ * GENERAL SETUP
  */
 
-export interface Env {
-	// Example binding to KV. Learn more at https://developers.cloudflare.com/workers/runtime-apis/kv/
-	// MY_KV_NAMESPACE: KVNamespace;
-	//
-	// Example binding to Durable Object. Learn more at https://developers.cloudflare.com/workers/runtime-apis/durable-objects/
-	// MY_DURABLE_OBJECT: DurableObjectNamespace;
-	//
-	// Example binding to R2. Learn more at https://developers.cloudflare.com/workers/runtime-apis/r2/
-	// MY_BUCKET: R2Bucket;
-	//
-	// Example binding to a Service. Learn more at https://developers.cloudflare.com/workers/runtime-apis/service-bindings/
-	// MY_SERVICE: Fetcher;
-	//
-	// Example binding to a Queue. Learn more at https://developers.cloudflare.com/queues/javascript-apis/
-	// MY_QUEUE: Queue;
-}
+const app = new Hono<{ Bindings: Bindings }>();
+const api = app.basePath('/api');
 
-export default {
-	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-		return new Response('Hello World!');
-	},
-};
+// OR
+// const api = new Hono();
+// app.route('/api', api);
+
+app.use('', cors());
+
+app.get('', (c) => c.text('Welcome to the API'));
+
+api.get('', (c) => c.text('hello'));
+
+api.get('/books', (c) => {
+	return c.json({ books: 'books' });
+});
+
+api.get('/users', async (c) => {
+	const { results } = await c.env.DB.prepare('SELECT * FROM Users').all();
+
+	const json = JSON.stringify(results);
+
+	return c.json(json);
+});
+
+api.post('/users', async (c) => {
+	const { id, name, rank } = await c.req.parseBody();
+
+	const sqlCommand = `INSERT INTO Users (id, name, rank) VALUES (${id}, ${name}, ${rank})`;
+
+	try {
+		const { success } = await c.env.DB.prepare(sqlCommand).run();
+
+		if (success) {
+			c.status(201);
+			return c.json({
+				success: true,
+			});
+		} else {
+			c.status(400);
+			return c.json({
+				error: 'Something went wrong',
+			});
+		}
+	} catch (error) {
+		c.status(500);
+		return c.json({
+			error: 'Something went wrong',
+		});
+	}
+
+	return c.text('congrats');
+});
+
+export default app;

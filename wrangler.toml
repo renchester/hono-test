@@ -49,3 +49,8 @@ compatibility_date = "2023-08-07"
 # [[migrations]]
 # tag = "v1"
 # new_classes = ["MyDurableObject"]
+
+[[d1_databases]]
+binding = "DB" # i.e. available in your Worker on env.DB
+database_name = "hono-db"
+database_id = "54c47dcb-4207-4e8a-bb22-3d03530fb974"
