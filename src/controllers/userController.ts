@@ -1,5 +1,5 @@
 import { Context, Next } from 'hono';
-import { zValidator } from '@hono/zod-validator';
+import { validator } from 'hono/validator';
 import userSchema from '../schemas/UserSchema';
 
 const userController = (() => {
@@ -12,31 +12,29 @@ const userController = (() => {
 
 	// app.post('/api/users')
 	const create_user = [
-		zValidator('form', userSchema, (result, c) => {
-			if (!result.success) {
-				return c.text('Invalid schema', 400);
+		validator('json', (value, c) => {
+			const parsed = userSchema.safeParse(value);
+
+			if (!parsed.success) {
+				return c.json({ error: 'Invalid schema' }, 400);
 			}
+
+			return parsed.data;
 		}),
 
 		async (c: Context) => {
-			const { id, name, rank } = await c.req.parseBody();
+			const { id, name, rank } = await c.req.json();
 
-			const sqlCommand = `INSERT INTO Users (id, name, rank) VALUES (${id}, ${name}, ${rank})`;
+			const sqlCommand = `INSERT INTO Users (id, name, rank) VALUES ("${id}", "${name}", "${rank}")`;
 
 			try {
 				const { success } = await c.env.DB.prepare(sqlCommand).run();
 
 				if (success) {
-					c.status(201);
-					return c.json({
-						success: true,
-					});
+					return c.json({ success: true }, 201);
 				}
 			} catch (error) {
-				c.status(500);
-				return c.json({
-					error: 'Something went wrong',
-				});
+				return c.json({ error: 'Something went wrong' }, 500);
 			}
 		},
 	];
