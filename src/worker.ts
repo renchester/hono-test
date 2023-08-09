@@ -1,66 +1,44 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { logger } from 'hono/logger';
+import api from './routes/api';
 
 type Bindings = {
 	DB: D1Database;
 };
 
 /**
- * GENERAL SETUP
+ * ===== GENERAL SETUP =====
  */
 
 const app = new Hono<{ Bindings: Bindings }>();
-const api = app.basePath('/api');
 
-// OR
-// const api = new Hono();
-// app.route('/api', api);
+app.use('*', cors()); // temporary, edit cors later
 
-app.use('', cors());
+app.use('*', logger());
 
-app.get('', (c) => c.text('Welcome to the API'));
+app.get('', (c) => c.text('Welcome to the ClubsAll API'));
 
-api.get('', (c) => c.text('hello'));
+/**
+ * ===== ROUTES =====
+ */
 
-api.get('/books', (c) => {
-	return c.json({ books: 'books' });
+app.route('/api', api);
+
+/**
+ * ===== ERROR HANDLERS =====
+ */
+
+// Log the error
+app.onError((err, c) => {
+	console.error(`Error ${err.message}`);
+	console.error(err.stack);
+	return c.json({ error: '500 - Internal Server Error' }, 500);
 });
 
-api.get('/users', async (c) => {
-	const { results } = await c.env.DB.prepare('SELECT * FROM Users').all();
-
-	const json = JSON.stringify(results);
-
-	return c.json(json);
-});
-
-api.post('/users', async (c) => {
-	const { id, name, rank } = await c.req.parseBody();
-
-	const sqlCommand = `INSERT INTO Users (id, name, rank) VALUES (${id}, ${name}, ${rank})`;
-
-	try {
-		const { success } = await c.env.DB.prepare(sqlCommand).run();
-
-		if (success) {
-			c.status(201);
-			return c.json({
-				success: true,
-			});
-		} else {
-			c.status(400);
-			return c.json({
-				error: 'Something went wrong',
-			});
-		}
-	} catch (error) {
-		c.status(500);
-		return c.json({
-			error: 'Something went wrong',
-		});
-	}
-
-	return c.text('congrats');
+// Not Found
+app.notFound((c) => {
+	return c.json({ error: '404 - Invalid Path' }, 404);
 });
 
 export default app;
